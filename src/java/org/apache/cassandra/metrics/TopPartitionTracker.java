@@ -393,7 +393,7 @@ public class TopPartitionTracker implements Closeable
 
     public static class StoredTopPartitions
     {
-        public static StoredTopPartitions EMPTY = new StoredTopPartitions(Collections.emptyList(), 0);
+        public static final StoredTopPartitions EMPTY = new StoredTopPartitions(Collections.emptyList(), 0);
         public final List<TopPartition> topPartitions;
         public final long lastUpdated;
 
