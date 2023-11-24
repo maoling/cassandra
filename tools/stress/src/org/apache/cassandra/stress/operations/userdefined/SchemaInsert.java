@@ -122,13 +122,18 @@ public class SchemaInsert extends SchemaStatement
 
         public boolean run() throws Exception
         {
+            System.out.println("fuck_partitions_size:" + partitions.size());
             for (PartitionIterator iterator : partitions)
             {
                 while (iterator.hasNext())
                 {
                     Row row = iterator.next();
+                    //System.out.println("fuck_row:" + row);
                     writer.rawAddRow(rowArgs(row));
                     rowCount += 1;
+                    if (System.currentTimeMillis() % 100000 == 0) {
+                        System.out.println("fuck_rowCount:" + rowCount);
+                    }
                 }
             }
 

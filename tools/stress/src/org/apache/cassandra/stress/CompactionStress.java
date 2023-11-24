@@ -57,7 +57,6 @@ import org.apache.cassandra.io.sstable.StressCQLSSTableWriter;
 import org.apache.cassandra.io.sstable.format.SSTableFormat.Components;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
 import org.apache.cassandra.io.util.FileUtils;
-import org.apache.cassandra.locator.InetAddressAndPort;
 import org.apache.cassandra.stress.generate.PartitionGenerator;
 import org.apache.cassandra.stress.generate.SeedManager;
 import org.apache.cassandra.stress.operations.userdefined.SchemaInsert;
@@ -199,15 +198,11 @@ public abstract class CompactionStress implements Runnable
         Random random = new Random(seed.hashCode());
 
         IPartitioner p = ClusterMetadata.current().tokenMap.partitioner();
-       // tokenMetadata.clearUnsafe();
         for (int i = 1; i <= numTokens; i++)
         {
-            InetAddressAndPort addr = FBUtilities.getBroadcastAddressAndPort();
             List<Token> tokens = Lists.newArrayListWithCapacity(numTokens);
             for (int j = 0; j < numTokens; ++j)
                 tokens.add(p.getRandomToken(random));
-
-//            tokenMetadata.updateNormalTokens(tokens, addr);
         }
     }
 
@@ -218,22 +213,28 @@ public abstract class CompactionStress implements Runnable
     public static class Compaction extends CompactionStress
     {
 
-        @Option(name = {"-m", "--maximal"}, description = "Force maximal compaction (default true)")
+        @Option(name = {"-m", "--maximal"}, description = "Force maximal compaction (default false)")
         Boolean maximal = false;
 
         @Option(name = {"-t", "--threads"}, description = "Number of compactor threads to use for bg compactions (default 4)")
         Integer threads = 4;
 
+        @Option(name = {"-r", "--rate"}, description = "Rate limiter for compaction throughput bytes per second (default 0)")
+        Integer throughputBytesPerSec = 0;
+
         public void run()
         {
+            long start = System.currentTimeMillis();
             ClusterMetadataService.initializeForTools(true);
             //Setup
             CompactionManager.instance.setMaximumCompactorThreads(threads);
             CompactionManager.instance.setCoreCompactorThreads(threads);
-            CompactionManager.instance.setRateInBytes(0);
+            CompactionManager.instance.setRateInBytes(throughputBytesPerSec);
 
             StressProfile stressProfile = getStressProfile();
             ColumnFamilyStore cfs = initCf(stressProfile, true);
+            System.out.println("fuck CompactionStrategyManager:" + cfs.getCompactionStrategyManager());
+            System.out.println("fuck Strategies " + cfs.getCompactionStrategyManager().getStrategies());
             cfs.getCompactionStrategyManager().compactionLogger.enable();
 
             List<Future<?>> futures = new ArrayList<>(threads);
@@ -264,7 +265,8 @@ public abstract class CompactionStress implements Runnable
                 Uninterruptibles.sleepUninterruptibly(10, TimeUnit.SECONDS);
             }
 
-            System.out.println("Finished! Shutting down...");
+            long timeSpent = System.currentTimeMillis() - start;
+            System.out.println(String.format("Finished! timeSpent: %dms. Shutting down...", timeSpent));
             CompactionManager.instance.forceShutdown();
 
             //Wait for cleanup to finish before forcing
@@ -284,7 +286,7 @@ public abstract class CompactionStress implements Runnable
     @Command(name = "write", description = "write data directly to disk")
     public static class DataWriter extends CompactionStress
     {
-        private static double BYTES_IN_GIB = 1024 * 1014 * 1024;
+        private static double BYTES_IN_GIB = 1024 * 1024 * 1024;
 
         @Option(name = { "-g", "--gbsize"}, description = "Total GB size on disk you wish to write", required = true)
         Integer totalSizeGiB;
@@ -303,7 +305,8 @@ public abstract class CompactionStress implements Runnable
 
         public void run()
         {
-            ClusterMetadataService.initializeForTools(true);
+            long start = System.currentTimeMillis();
+            ClusterMetadataService.initializeForTools(false);
             Keyspace.setInitialized();
             StressProfile stressProfile = getStressProfile();
             ColumnFamilyStore cfs = initCf(stressProfile, false);
@@ -319,7 +322,7 @@ public abstract class CompactionStress implements Runnable
 
             for (int i = 0; i < threads; i++)
             {
-                //Every thread needs it's own writer
+                //Every thread needs its own writer
                 final SchemaInsert insert = stressProfile.getOfflineInsert(null, generator, seedManager, settings);
                 final StressCQLSSTableWriter tableWriter = insert.createWriter(cfs, bufferSize, makeRangeAware);
                 executorService.submit(() -> {
@@ -354,7 +357,8 @@ public abstract class CompactionStress implements Runnable
             Uninterruptibles.awaitUninterruptibly(finished);
 
             currentSizeGiB = directories.getRawDiretoriesSize() / BYTES_IN_GIB;
-            System.out.println(String.format("Finished writing %.2fGB", currentSizeGiB));
+            long timeSpent = System.currentTimeMillis() - start;
+            System.out.println(String.format("Finished writing %.2fGB, timeSpent: %dms", currentSizeGiB, timeSpent));
         }
     }
 
