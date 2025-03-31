@@ -318,6 +318,11 @@ public class CassandraMetricsRegistry extends MetricRegistry
         return histogram;
     }
 
+    public <T extends Gauge<?>> T gauge(MetricName name, T gauge)
+    {
+        return register(name, gauge);
+    }
+
     public <T extends Gauge<?>> T gauge(MetricName name, MetricName alias, T gauge)
     {
         T gaugeLoc = register(name, gauge);

@@ -35,7 +35,6 @@ import org.apache.cassandra.distributed.api.IInvokableInstance;
 import org.apache.cassandra.distributed.shared.Metrics;
 import org.apache.cassandra.distributed.test.TestBaseImpl;
 import org.apache.cassandra.hints.Hint;
-import org.apache.cassandra.hints.HintsService;
 import org.apache.cassandra.metrics.HintsServiceMetrics;
 import org.apache.cassandra.net.Verb;
 import org.apache.cassandra.utils.concurrent.Future;
@@ -199,7 +198,7 @@ public class HintsServiceMetricsTest extends TestBaseImpl
 
     private static Long countHintsFileSize(IInvokableInstance node)
     {
-        return node.callOnInstance(() -> HintsService.instance.hintsServiceMetrics.hintsFileSize.getValue());
+        return node.callOnInstance(HintsServiceMetrics.hintsFileSize::getValue);
     }
 
     @SuppressWarnings("Convert2MethodRef")
