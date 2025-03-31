@@ -17,6 +17,8 @@
  */
 package org.apache.cassandra.metrics;
 
+import java.io.Serializable;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,7 +48,7 @@ public final class HintsServiceMetrics
     public static final Meter hintsSucceeded = Metrics.meter(factory.createMetricName("HintsSucceeded"));
     public static final Meter hintsFailed    = Metrics.meter(factory.createMetricName("HintsFailed"));
     public static final Meter hintsTimedOut  = Metrics.meter(factory.createMetricName("HintsTimedOut"));
-    public final Gauge<Long> hintsFileSize;
+    public static final Gauge<Long> hintsFileSize = Metrics.gauge(factory.createMetricName("HintsFileSize"), new TotalHintsSizeGauge());
     // Corresponding to the hinted_handoff_throttle_in_kb configuration
     public static final Counter hintsThrottle = Metrics.counter(factory.createMetricName("HintsThrottle"));
 
@@ -62,10 +64,13 @@ public final class HintsServiceMetrics
                                                                                                .executor(ImmediateExecutor.INSTANCE)
                                                                                                .build(address -> Metrics.histogram(factory.createMetricName("Hint_delays-"+address.toString().replace(':', '.')), false));
 
-    public HintsServiceMetrics(HintsService hintsService)
+    private static class TotalHintsSizeGauge implements Gauge<Long>, Serializable
     {
-        hintsFileSize = Metrics.register(factory.createMetricName("HintsFileSize"),
-                                         hintsService::getTotalHintsSizeOfNode);
+        @Override
+        public Long getValue()
+        {
+            return HintsService.instance.getTotalHintsSizeOfNode();
+        }
     }
 
     public static void updateDelayMetrics(InetAddressAndPort endpoint, long delay)
